@@ -1,0 +1,34 @@
+[tool.poetry]
+name = "voice-to-notes-bot"
+version = "0.1.0"
+description = "Telegram bot for voice-to-text conversion"
+authors = ["Your Name <your.email@example.com>"]
+readme = "README.md"
+packages = [{include = "src"}]
+
+[tool.poetry.dependencies]
+python = "^3.11"
+aiogram = "^3.10"
+taskiq = "^1.0"
+taskiq-redis = "^1.0"
+sqlalchemy = "^2.0"
+alembic = "^1.13"
+asyncpg = "^0.29"
+redis = "^5.0"
+openai = "^1.0"
+notion-client = "^2.0"
+pydantic = "^2.0"
+pydantic-settings = "^2.0"
+python-dotenv = "^1.0"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^7.0"
+pytest-asyncio = "^0.21"
+pytest-mock = "^3.0"
+black = "^23.0"
+isort = "^5.0"
+mypy = "^1.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
