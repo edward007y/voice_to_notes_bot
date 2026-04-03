@@ -50,7 +50,7 @@ services:
         condition: service_healthy
       db:
         condition: service_healthy
-    command: taskiq worker src.tasks.broker:broker --reload
+    command: taskiq worker src.tasks.broker:broker src.tasks.tasks --reload
 
     
 volumes:

@@ -1,29 +1,31 @@
+from aiogram import Bot
+from aiogram.client.default import DefaultBotProperties
+from aiogram.enums import ParseMode
 from taskiq import TaskiqEvents, TaskiqState
 from taskiq_redis import ListQueueBroker, RedisAsyncResultBackend
 
 from src.core.config import settings
 
-# Налаштування backend для збереження результатів виконання задач
 result_backend = RedisAsyncResultBackend(
     redis_url=settings.redis_url,
 )
 
-# Налаштування основного брокера завдань
 broker = ListQueueBroker(
     url=settings.redis_url,
-    result_backend=result_backend,
-)
+).with_result_backend(result_backend)
 
 
-# Ініціалізація ресурсів при старті воркера
 @broker.on_event(TaskiqEvents.WORKER_STARTUP)
 async def startup_broker(state: TaskiqState) -> None:
-    """Виконується при запуску worker-процесу."""
-    pass  # Тут можна зберегти з'єднання з БД, наприклад: state.db_pool = ...
+    """Виконується при запуску worker-процесу. Ініціалізуємо Bot."""
+    state.bot = Bot(
+        token=settings.bot_token.get_secret_value(),
+        default=DefaultBotProperties(parse_mode=ParseMode.HTML),
+    )
 
 
-# Закриття ресурсів при зупинці воркера
 @broker.on_event(TaskiqEvents.WORKER_SHUTDOWN)
 async def shutdown_broker(state: TaskiqState) -> None:
-    """Виконується при зупинці worker-процесу."""
-    pass  # Тут закриваємо з'єднання
+    """Виконується при зупинці worker-процесу. Закриваємо сесію."""
+    if hasattr(state, "bot"):
+        await state.bot.session.close()
