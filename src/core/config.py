@@ -9,10 +9,10 @@ class Settings(BaseSettings):
     db_url: str
     redis_url: str
 
-    openai_api_key: SecretStr
+    OPENAI_API_KEY: SecretStr
 
-    notion_api_key: SecretStr
-    notion_database_id: str
+    NOTION_API_KEY: SecretStr
+    NOTION_DATABASE_ID: str
 
     # Конфігурація Pydantic для читання з файлу .env
     model_config = SettingsConfigDict(

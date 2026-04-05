@@ -6,7 +6,7 @@ from openai import AsyncOpenAI
 from src.core.config import settings
 
 # Ініціалізація асинхронного клієнта OpenAI
-client = AsyncOpenAI(api_key=settings.openai_api_key.get_secret_value())
+client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY.get_secret_value())
 
 
 async def transcribe_audio(file_path: Path) -> str:

@@ -43,6 +43,8 @@ services:
       # Перевизначаємо хости для роботи всередині Docker-мережі
       - REDIS_URL=redis://redis:6379/0
       - DB_URL=postgresql+asyncpg://bot_user:bot_password@db:5432/voice_notes_db
+      - NOTION_API_KEY=${NOTION_API_KEY}
+      - NOTION_DATABASE_ID=${NOTION_DATABASE_ID}
     volumes:
       - .:/app
     depends_on:
