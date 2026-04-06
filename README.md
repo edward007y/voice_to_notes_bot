@@ -152,13 +152,14 @@ voice_to_notes_bot/
 │   │   ├── openai_llm.py        # GPT-4o-mini prompts and response handling
 │   │   └── notion.py            # Notion API operations
 │   └── core/
-│       ├── config.py            # Pydantic Settings
-│       └── db.py                # SQLAlchemy async engine + session
+│   ├    ├── config.py            # Pydantic Settings
+│   ├    └── db.py                # SQLAlchemy async engine + session
+│   ├── db/
+         ├── database.py
+         ├── models.py
 ├── alembic/                     # Database migrations
 ├── tests/                       # pytest test suite
-├── docker/
-│   ├── Dockerfile.bot
-│   └── Dockerfile.worker
+├── Dockerfile
 ├── docker-compose.yml
 ├── pyproject.toml
 └── .env.example
