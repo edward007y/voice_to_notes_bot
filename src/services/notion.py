@@ -1,32 +1,25 @@
-# Notion API operations
 import logging
 from datetime import datetime
 
 from notion_client import AsyncClient
 
-from src.core.config import settings
-
 logger = logging.getLogger(__name__)
 
-# Ініціалізація асинхронного клієнта Notion
-notion = AsyncClient(auth=settings.NOTION_API_KEY.get_secret_value())
 
-
-async def create_notion_page(summary: str, action_items: list[str]) -> str:
+async def create_notion_page(
+    summary: str, action_items: list[str], api_key: str, db_id: str
+) -> str:
     """
-    Створює сторінку в базі даних Notion з результатами розпізнавання.
-
-    :param summary: Текст сумаризації.
-    :param action_items: Список задач.
-    :return: URL створеної сторінки.
+    Створює сторінку в базі даних Notion, використовуючи персональні ключі користувача.
     """
     logger.info("Початок експорту даних у Notion...")
 
-    # Формуємо заголовок з поточною датою
+    # Ініціалізуємо клієнта з персональним ключем юзера
+    notion = AsyncClient(auth=api_key)
+
     date_str = datetime.now().strftime("%Y-%m-%d %H:%M")
     title = f"Голосова нотатка від {date_str}"
 
-    # Базові блоки сторінки
     children_blocks = [
         {
             "object": "block",
@@ -38,7 +31,6 @@ async def create_notion_page(summary: str, action_items: list[str]) -> str:
         },
     ]
 
-    # Додаємо задачі у вигляді чекліста (to_do блоків), якщо вони є
     if action_items:
         children_blocks.append(
             {
@@ -55,9 +47,9 @@ async def create_notion_page(summary: str, action_items: list[str]) -> str:
             )
 
     try:
-        # Відправляємо запит до Notion API
         response = await notion.pages.create(
-            parent={"database_id": settings.NOTION_DATABASE_ID},
+            # Використовуючи персональний ID бази
+            parent={"database_id": db_id},
             properties={"Name": {"title": [{"text": {"content": title}}]}},
             children=children_blocks,
         )

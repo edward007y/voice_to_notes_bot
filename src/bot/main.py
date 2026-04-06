@@ -5,14 +5,18 @@ from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 
-# Додаємо voice у імпорти з пакету handlers
 from src.bot.handlers import commands, voice
 from src.core.config import settings
+from src.db.database import init_models  # ДОДАНО: імпорт ініціалізації БД
 
 
 async def main() -> None:
     """Головна точка входу для запуску бота."""
     logging.basicConfig(level=logging.INFO)
+
+    # ДОДАНО: Ініціалізуємо базу даних перед запуском бота
+    logging.info("Ініціалізація бази даних...")
+    await init_models()
 
     bot = Bot(
         token=settings.bot_token.get_secret_value(),

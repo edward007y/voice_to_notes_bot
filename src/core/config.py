@@ -11,9 +11,6 @@ class Settings(BaseSettings):
 
     OPENAI_API_KEY: SecretStr
 
-    NOTION_API_KEY: SecretStr
-    NOTION_DATABASE_ID: str
-
     # Конфігурація Pydantic для читання з файлу .env
     model_config = SettingsConfigDict(
         env_file=".env", env_file_encoding="utf-8", extra="ignore"

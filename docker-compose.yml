@@ -1,16 +1,14 @@
 services:
   db:
     image: postgres:15-alpine
-    container_name: voice_bot_db
-    restart: unless-stopped
     environment:
-      POSTGRES_USER: bot_user
-      POSTGRES_PASSWORD: bot_password
-      POSTGRES_DB: voice_notes_db
+      - POSTGRES_USER=bot_user
+      - POSTGRES_PASSWORD=bot_password
+      - POSTGRES_DB=voice_notes_db
     ports:
       - "5432:5432"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - pgdata:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U bot_user -d voice_notes_db"]
       interval: 5s
@@ -19,42 +17,52 @@ services:
 
   redis:
     image: redis:7-alpine
-    container_name: voice_bot_redis
-    restart: unless-stopped
-    command: redis-server --appendonly yes
     ports:
       - "6379:6379"
     volumes:
-      - redis_data:/data
+      - redisdata:/data
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
-      timeout: 3s
+      timeout: 5s
       retries: 5
+
   worker:
     build:
       context: .
-      dockerfile: docker/Dockerfile.worker
-    container_name: voice_bot_worker
-    restart: unless-stopped
-    env_file:
-      - .env
+      dockerfile: Dockerfile
+    command: taskiq worker src.tasks.broker:broker src.tasks.tasks --workers 1 --max-async-tasks 3
     environment:
-      # Перевизначаємо хости для роботи всередині Docker-мережі
       - REDIS_URL=redis://redis:6379/0
       - DB_URL=postgresql+asyncpg://bot_user:bot_password@db:5432/voice_notes_db
-      - NOTION_API_KEY=${NOTION_API_KEY}
-      - NOTION_DATABASE_ID=${NOTION_DATABASE_ID}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - BOT_TOKEN=${BOT_TOKEN}
     volumes:
-      - .:/app
+      - ./data:/app/data
     depends_on:
-      redis:
-        condition: service_healthy
       db:
         condition: service_healthy
-    command: taskiq worker src.tasks.broker:broker src.tasks.tasks --reload
+      redis:
+        condition: service_healthy
 
-    
+  bot:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: python src/bot/main.py
+    environment:
+      - BOT_TOKEN=${BOT_TOKEN}
+      - REDIS_URL=redis://redis:6379/0
+      - DB_URL=postgresql+asyncpg://bot_user:bot_password@db:5432/voice_notes_db
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+    volumes:
+      - ./data:/app/data
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
 volumes:
-  postgres_data:
-  redis_data:
+  pgdata:
+  redisdata:
