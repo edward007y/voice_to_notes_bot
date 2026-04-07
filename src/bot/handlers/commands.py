@@ -1,3 +1,5 @@
+import re
+
 from aiogram import Router, types
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
@@ -9,7 +11,6 @@ from src.db.models import User
 router = Router(name="commands_router")
 
 
-# Визначаємо стани (кроки), в яких може перебувати користувач
 class NotionSetup(StatesGroup):
     waiting_for_api_key = State()
     waiting_for_db_id = State()
@@ -17,94 +18,80 @@ class NotionSetup(StatesGroup):
 
 @router.message(Command("start"))
 async def cmd_start(message: types.Message, state: FSMContext) -> None:
-    """Обробник команди /start. Перевіряє юзера в БД."""
     if not message.from_user:
         return
 
-    # Відкриваємо сесію бази даних
     async with async_session_maker() as session:
-        # Шукаємо користувача за його Telegram ID
         user = await session.get(User, message.from_user.id)
-
-        # Якщо юзера немає в базі, створюємо його
         if not user:
             user = User(telegram_id=message.from_user.id)
             session.add(user)
             await session.commit()
 
-        # Якщо в юзера немає ключів Notion, починаємо процес збору
         if not user.notion_api_key or not user.notion_db_id:
             await message.answer(
-                "Привіт! Я твій персональний AI-помічник. 🤖\n\n"
-                "Щоб я міг зберігати твої голосові нотатки, мені потрібен доступ до твоєї бази даних у Notion.\n\n"
-                "Будь ласка, надішли свій <b>Notion API Key</b> (Internal Integration Secret):"
+                "Привіт! Я твій персональний AI-помічник. 🎙\n\n"
+                "Щоб я міг магічним чином перетворювати твої голосові на структуровані нотатки, "
+                "нам потрібно один раз налаштувати зв'язок з твоїм Notion.\n\n"
+                "<b>Крок 1: Створення ключа (API Key)</b> 🔑\n"
+                "1. Перейди сюди: https://www.notion.so/my-integrations\n"
+                "2. Натисни кнопку <b>New integration</b>.\n"
+                "3. Назви її, наприклад, <i>Voice Notes Bot</i> і натисни Submit.\n"
+                "4. Скопіюй <b>Internal Integration Secret</b> (він починається на <code>secret_...</code>).\n\n"
+                "👇 <b>Надішли цей ключ сюди повідомленням:</b>",
+                disable_web_page_preview=True,
             )
-            # Переводимо бота в стан очікування API ключа
             await state.set_state(NotionSetup.waiting_for_api_key)
         else:
             await message.answer(
-                "Привіт! Твій Notion вже підключено. Чекаю на голосові повідомлення! 🎙"
+                "Привіт! Твій Notion вже підключено. Просто надішли мені голосове повідомлення! 🎙\n\n<i>(Щоб змінити базу, натисни /reset)</i>"
             )
-
-
-# ... попередній код (cmd_start) ...
-
-
-@router.message(Command("reset"))
-async def cmd_reset(message: types.Message, state: FSMContext) -> None:
-    """Обробник команди /reset. Очищає ключі користувача в БД."""
-    if not message.from_user:
-        return
-
-    async with async_session_maker() as session:
-        user = await session.get(User, message.from_user.id)
-        if user:
-            # Видаляємо старі ключі
-            user.notion_api_key = None
-            user.notion_db_id = None
-            await session.commit()
-
-    # Про всяк випадок очищаємо поточний стан (якщо юзер був посеред вводу)
-    await state.clear()
-
-    await message.answer("🔄 Твої налаштування Notion успішно скинуто!")
-
-    # Одразу викликаємо /start, щоб запропонувати ввести нові ключі
-    await cmd_start(message, state)
-
-
-# ... далі йдуть process_api_key та process_db_id ...
 
 
 @router.message(NotionSetup.waiting_for_api_key)
 async def process_api_key(message: types.Message, state: FSMContext) -> None:
-    """Зберігає API ключ у пам'ять FSM і просить DB ID."""
     if not message.text:
         return
 
-    # Зберігаємо ключ у тимчасове сховище стану
     await state.update_data(api_key=message.text.strip())
 
     await message.answer(
-        "Чудово! ✅\n\n"
-        "Тепер надішли <b>Notion Database ID</b> (послідовність з 32 символів із посилання на твою базу):"
+        "Ключ прийнято! ✅\n\n"
+        "<b>Крок 2: Підготовка бази даних</b> 📁\n"
+        "1. Створи нову базу даних у Notion (наприклад, вибери <i>Table view</i> на порожній сторінці).\n"
+        "2. ⚠️ <b>НАЙВАЖЛИВІШЕ:</b> У правому верхньому куті сторінки натисни на <code>...</code> -> <b>Add connections</b> -> знайди і вибери свою інтеграцію <i>Voice Notes Bot</i>.\n"
+        "3. Натисни <b>Share</b> і скопіюй посилання на сторінку (Copy link).\n\n"
+        "👇 <b>Надішли мені це повне посилання:</b>"
     )
-    # Переходимо на наступний крок
     await state.set_state(NotionSetup.waiting_for_db_id)
 
 
 @router.message(NotionSetup.waiting_for_db_id)
 async def process_db_id(message: types.Message, state: FSMContext) -> None:
-    """Отримує DB ID, дістає API ключ з пам'яті FSM і зберігає все в PostgreSQL."""
     if not message.text or not message.from_user:
         return
 
-    # Отримуємо тимчасові дані (API ключ)
+    raw_input = message.text.strip()
+
+    # Розумний парсинг ID: видаляємо дефіси і шукаємо 32 символи (hex)
+    clean_input = raw_input.replace("-", "")
+    match = re.search(r"([a-f0-9]{32})", clean_input.lower())
+
+    if not match:
+        await message.answer(
+            "⚠️ Не зміг розпізнати посилання. \n"
+            "Воно має виглядати приблизно так: \n"
+            "<code>https://www.notion.so/workspace/1234567890abcdef1234567890abcdef?v=...</code>\n\n"
+            "Спробуй скопіювати посилання ще раз."
+        )
+        return
+
+    # Отримуємо чистий 32-значний ID
+    db_id = match.group(1)
+
     data = await state.get_data()
     api_key = data.get("api_key")
-    db_id = message.text.strip()
 
-    # Зберігаємо ключі в базу даних
     async with async_session_maker() as session:
         user = await session.get(User, message.from_user.id)
         if user:
@@ -112,10 +99,26 @@ async def process_db_id(message: types.Message, state: FSMContext) -> None:
             user.notion_db_id = db_id
             await session.commit()
 
-    # Очищуємо стан, оскільки налаштування завершено
     await state.clear()
 
     await message.answer(
-        "🎉 <b>Готово!</b> Твої ключі успішно збережено.\n\n"
-        "Тепер ти можеш просто відправляти мені голосові повідомлення, і я буду автоматично структурувати їх у твій Notion!"
+        "🎉 <b>Бінго! Налаштування завершено.</b>\n\n"
+        "Тепер ти можеш просто надиктовувати мені свої думки, і я буду автоматично розкладати їх по поличках у твоєму Notion. Спробуй записати перше голосове прямо зараз! 🎙"
     )
+
+
+@router.message(Command("reset"))
+async def cmd_reset(message: types.Message, state: FSMContext) -> None:
+    if not message.from_user:
+        return
+
+    async with async_session_maker() as session:
+        user = await session.get(User, message.from_user.id)
+        if user:
+            user.notion_api_key = None
+            user.notion_db_id = None
+            await session.commit()
+
+    await state.clear()
+    await message.answer("🔄 Налаштування Notion скинуто!")
+    await cmd_start(message, state)
