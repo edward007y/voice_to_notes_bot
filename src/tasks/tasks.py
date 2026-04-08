@@ -1,38 +1,26 @@
 import asyncio
 import logging
+import os
 from pathlib import Path
 
-from aiogram import Bot
-from taskiq import Context, TaskiqDepends
+from aiogram import Bot  # ДОДАНО
+from taskiq import TaskiqDepends
 
+from src.core.config import settings  # ДОДАНО
 from src.db.database import async_session_maker
 from src.db.models import User
 from src.services.audio import convert_ogg_to_mp3
 from src.services.notion import create_notion_page
-from src.services.openai_llm import summarize_text
-from src.services.whisper import transcribe_audio
+from src.services.openai_llm import summarize_text, transcribe_audio
 from src.tasks.broker import broker
 
 logger = logging.getLogger(__name__)
 
 
-def get_bot(context: Context = TaskiqDepends()) -> Bot:
-    """Dependency Injection для отримання екземпляра бота зі state."""
-    return context.state.bot
-
-
-@broker.task(task_name="summarize_audio_task")
-async def summarize_task(transcribed_text: str) -> dict:
-    """Підзадача для сумаризації."""
-    result = await summarize_text(transcribed_text)
-    return result.model_dump()
-
-
 @broker.task(task_name="export_to_notion_task")
-async def export_to_notion_task(summary_data: dict, user_id: int) -> str:
-    """Підзадача для експорту в Notion. Дістає ключі з БД."""
-
-    # Йдемо в базу за ключами
+async def export_to_notion_task(
+    summary_data: dict, user_id: int, lang_code: str = "uk"
+) -> str:
     async with async_session_maker() as session:
         user = await session.get(User, user_id)
         if not user or not user.notion_api_key or not user.notion_db_id:
@@ -47,8 +35,10 @@ async def export_to_notion_task(summary_data: dict, user_id: int) -> str:
         try:
             summary = summary_data.get("summary", "Текст відсутній.")
             action_items = summary_data.get("action_items", [])
-            # Передаємо ключі у сервіс
-            return await create_notion_page(summary, action_items, api_key, db_id)
+            # Передаємо мову у створення сторінки Notion
+            return await create_notion_page(
+                summary, action_items, api_key, db_id, lang_code
+            )
         except Exception as e:
             logger.warning(f"Помилка експорту в Notion (спроба {attempt}): {e}")
             if attempt == max_retries:
@@ -58,79 +48,66 @@ async def export_to_notion_task(summary_data: dict, user_id: int) -> str:
 
 
 @broker.task(task_name="transcribe_audio_task")
-async def transcribe_task(
-    file_path_str: str, user_id: int, bot: Bot = TaskiqDepends(get_bot)
-) -> str:
-    """
-    Головний Pipeline. Керує всіма етапами та оновлює статус у Telegram.
-    """
-    file_path = Path(file_path_str)
-    max_retries = 3
-    base_delay = 2
+async def transcribe_task(file_path: str, user_id: int) -> None:
+    logger.info(f"Починаємо обробку файлу: {file_path}")
 
-    # Відправляємо первинний статус і запам'ятовуємо об'єкт повідомлення
-    status_msg = await bot.send_message(
-        user_id, "🎙 <i>Аудіо отримано. Розпізнаю текст...</i>"
-    )
+    # 0. Дістаємо мову
+    async with async_session_maker() as session:
+        user = await session.get(User, user_id)
+        lang_code = user.language_code if (user and user.language_code) else "uk"
 
-    for attempt in range(1, max_retries + 1):
-        try:
-            # 1. Конвертація та транскрипція
-            mp3_path = await convert_ogg_to_mp3(file_path)
-            text = await transcribe_audio(mp3_path)
+    # Створюємо екземпляр бота для відправки повідомлень з воркера
+    bot = Bot(token=settings.bot_token.get_secret_value())
 
-            # Оновлюємо статус
-            await bot.edit_message_text(
-                "🧠 <i>Текст розпізнано. Генерую summary та action items...</i>",
-                chat_id=user_id,
-                message_id=status_msg.message_id,
-            )
+    try:
+        if not os.path.exists(file_path):
+            raise FileNotFoundError(f"Файл не знайдено: {file_path}")
 
-            # 2. Сумаризація (викликаємо напряму)
-            summary_data = await summarize_task(text)
+        # Відправляємо статус "В процесі" користувачу
+        status_msg = (
+            "⏳ Опрацьовую запис... / Processing audio..."
+            if lang_code == "uk"
+            else "⏳ Processing your voice note..."
+        )
+        await bot.send_message(chat_id=user_id, text=status_msg)
 
-            # Оновлюємо статус
-            await bot.edit_message_text(
-                "💾 <i>Дані структуровано. Зберігаю сторінку в Notion...</i>",
-                chat_id=user_id,
-                message_id=status_msg.message_id,
-            )
+        # 1. Транскрибація
+        # Стало (обгортаємо file_path у Path):
+        mp3_path = await convert_ogg_to_mp3(Path(file_path))
+        transcribed_text = await transcribe_audio(str(mp3_path))
 
-            # 3. Експорт у Notion
-            # ... всередині transcribe_task ...
+        # 2. Сумаризація
+        summary_data = await summarize_text(transcribed_text, lang_code)
 
-            # 3. Експорт у Notion (тепер передаємо і user_id)
-            page_url = await export_to_notion_task(summary_data, user_id)
+        # 3. Експорт у Notion
+        page_url = await export_to_notion_task(summary_data, user_id, lang_code)
 
-            # ...
+        logger.info(f"Пайплайн успішно завершено! Посилання на Notion: {page_url}")
 
-            # 4. Фінальне повідомлення
-            final_text = (
-                f"✅ <b>Готово!</b>\n\n"
-                f"<b>Розпізнаний текст:</b> <i>{text[:300]}{'...' if len(text) > 300 else ''}</i>\n\n"
-                f"🔗 <a href='{page_url}'>Відкрити нотатку в Notion</a>"
-            )
-            await bot.edit_message_text(
-                final_text, chat_id=user_id, message_id=status_msg.message_id
-            )
+        # 4. ВІДПРАВЛЯЄМО РЕЗУЛЬТАТ КОРИСТУВАЧУ
+        success_text = (
+            f"🎉 <b>Готово!</b> Ось твоя нотатка:\n{page_url}"
+            if lang_code == "uk"
+            else f"🎉 <b>Done!</b> Here is your note:\n{page_url}"
+        )
+        await bot.send_message(chat_id=user_id, text=success_text, parse_mode="HTML")
 
-            logger.info(f"Пайплайн успішно завершено для файлу {file_path}")
+    except Exception as e:
+        logger.error(f"Помилка у пайплайні транскрибації: {e}")
+        error_text = (
+            "❌ <b>Помилка:</b> Щось пішло не так під час обробки аудіо."
+            if lang_code == "uk"
+            else "❌ <b>Error:</b> Something went wrong during processing."
+        )
+        await bot.send_message(chat_id=user_id, text=error_text, parse_mode="HTML")
+        raise e
+    finally:
+        # Обов'язково закриваємо сесію бота
+        await bot.session.close()
 
-            # Очищення тимчасових файлів
-            file_path.unlink(missing_ok=True)
-            mp3_path.unlink(missing_ok=True)
-
-            return page_url
-
-        except Exception as e:
-            logger.warning(f"Помилка пайплайну (спроба {attempt}): {e}")
-            if attempt == max_retries:
-                await bot.edit_message_text(
-                    "❌ <i>Вибачте, сталася помилка під час обробки вашого аудіо. Спробуйте ще раз.</i>",
-                    chat_id=user_id,
-                    message_id=status_msg.message_id,
-                )
-                raise e
-            await asyncio.sleep(base_delay**attempt)
-
-    raise RuntimeError("Неочікуване завершення пайплайну")
+        # Видаляємо тимчасові файли
+        if os.path.exists(file_path):
+            os.remove(file_path)
+        mp3_path_to_remove = file_path.replace(".ogg", ".mp3")
+        if os.path.exists(mp3_path_to_remove):
+            os.remove(mp3_path_to_remove)

@@ -1,27 +1,31 @@
-# voice_to_notes_bot 🎙️
+# 🎙️ voice_to_notes_bot
 
-> A Telegram bot that converts voice messages into structured Notion pages — transcribed, summarized, and enriched with action items automatically.
+> A Telegram bot that converts voice messages into structured Notion pages — transcribed, summarized, and enriched with action items. Each user connects their own Notion workspace via a personal API key.
 
-![Python](https://img.shields.io/badge/Python-3.11%2B-blue?logo=python)
-![aiogram](https://img.shields.io/badge/aiogram-3.x-blue)
+![Python](https://img.shields.io/badge/Python-3.11%2B-blue?logo=python&logoColor=white)
+![aiogram](https://img.shields.io/badge/aiogram-3.x-2CA5E0?logo=telegram&logoColor=white)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15%2B-336791?logo=postgresql&logoColor=white)
+![Redis](https://img.shields.io/badge/Redis-7.x-DC382D?logo=redis&logoColor=white)
+![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker&logoColor=white)
 ![License](https://img.shields.io/badge/license-MIT-green)
-![Build](https://img.shields.io/badge/build-passing-brightgreen)
 
 ---
 
 ## 🚀 Features
 
-- **Voice-to-text transcription** — converts Telegram `.ogg` voice messages to text via OpenAI Whisper API
-- **AI summarization** — generates a structured summary and extracts action items using GPT-4o-mini
-- **Personal Notion export** — each user connects their own Notion integration; notes are saved to their personal Notion workspace
-- **Async task queue** — audio processing runs in background Taskiq workers, keeping the bot responsive
-- **Per-user API key storage** — users register their own Notion API key and database ID via `/settings`; credentials are stored securely in PostgreSQL
-- **Graceful error handling** — retry with exponential backoff on API failures, validation for audio duration (1s–5min limit)
-- **Fully containerized** — one `docker-compose up --build` command spins up the entire stack
+- **Voice-to-text** — transcribes Telegram voice messages (`.ogg`) via OpenAI Whisper API
+- **AI summarization** — extracts a structured summary and action items using GPT-4o-mini
+- **Personal Notion export** — notes land in each user's own Notion database using their personal integration token
+- **Smart URL parsing** — automatically extracts the 32-character database ID from any Notion URL
+- **Multi-language support** — users select their language via inline keyboard; GPT responds and Notion tags are created in the chosen language
+- **Guided onboarding** — FSM-based step-by-step setup collects Notion credentials interactively
+- **Async task queue** — audio processing runs in background Taskiq workers; the bot stays responsive throughout
+- **Resilient error handling** — exponential backoff on API failures, audio duration validation (1 s – 5 min), worker concurrency limit (max 3 tasks)
+- **Fully containerized** — one command starts the entire stack: bot, worker, Redis, PostgreSQL
 
 ---
 
-## 🛠 Tech Stack
+## 🛠️ Tech Stack
 
 | Layer | Technology | Version |
 |---|---|---|
@@ -31,10 +35,9 @@
 | Message Broker | [Redis](https://redis.io) | 7.x |
 | Database | [PostgreSQL](https://postgresql.org) | 15+ |
 | ORM | [SQLAlchemy](https://sqlalchemy.org) | 2.x (async) |
-| Migrations | [Alembic](https://alembic.sqlalchemy.org) | latest stable |
 | Config | [Pydantic Settings](https://docs.pydantic.dev/latest/concepts/pydantic_settings/) | 2.x |
 | HTTP Client | [httpx](https://www.python-httpx.org) | latest stable |
-| Audio Processing | [ffmpeg](https://ffmpeg.org) | latest stable |
+| Audio Conversion | [ffmpeg](https://ffmpeg.org) | latest stable |
 | Speech-to-Text | [OpenAI Whisper API](https://platform.openai.com/docs/guides/speech-to-text) | latest |
 | LLM | [GPT-4o-mini](https://platform.openai.com/docs/models) | latest |
 | Notion SDK | [notion-client](https://github.com/ramnes/notion-sdk-py) | latest stable |
@@ -46,9 +49,11 @@
 
 ### Prerequisites
 
-- Docker & Docker Compose installed
-- Telegram Bot token (from [@BotFather](https://t.me/BotFather))
-- OpenAI API key (for Whisper + GPT-4o-mini)
+- [Docker](https://docs.docker.com/get-docker/) and Docker Compose installed
+- Telegram Bot token — create one via [@BotFather](https://t.me/BotFather)
+- OpenAI API key — required for Whisper transcription and GPT-4o-mini summarization
+
+> **Notion credentials are not required in `.env`.** Each user provides their own Notion Integration Token and Database ID directly inside the bot during onboarding.
 
 ### 1. Clone the repository
 
@@ -63,26 +68,24 @@ cd voice_to_notes_bot
 cp .env.example .env
 ```
 
-Edit `.env` with your credentials:
+Fill in `.env`:
 
 ```env
 # Telegram
 TELEGRAM_BOT_TOKEN=your_telegram_bot_token
 
-# OpenAI
+# OpenAI (Whisper + GPT-4o-mini)
 OPENAI_API_KEY=your_openai_api_key
 
 # PostgreSQL
 POSTGRES_USER=postgres
-POSTGRES_PASSWORD=your_password
+POSTGRES_PASSWORD=your_secure_password
 POSTGRES_DB=voice_notes
-DATABASE_URL=postgresql+asyncpg://postgres:your_password@postgres:5432/voice_notes
+DATABASE_URL=postgresql+asyncpg://postgres:your_secure_password@postgres:5432/voice_notes
 
 # Redis
 REDIS_URL=redis://redis:6379/0
 ```
-
-> **Note:** Notion API keys and database IDs are configured **per user** directly in the bot via `/settings` — they are not required in `.env`.
 
 ### 3. Build and run
 
@@ -90,107 +93,99 @@ REDIS_URL=redis://redis:6379/0
 docker-compose up --build
 ```
 
-This command starts four services: `bot`, `worker`, `postgres`, and `redis`.
-
-### 4. Apply database migrations
-
-```bash
-docker-compose exec bot alembic upgrade head
-```
+Starts four services: `bot`, `worker`, `postgres`, `redis`.
 
 ---
 
 ## ▶️ Usage
 
-### For end users
-
-1. Start the bot: send `/start` in Telegram
-2. Connect your Notion workspace via `/settings`:
-   - Provide your **Notion Internal Integration Token**
-   - Provide your **Notion Database ID** (the target database where notes will be saved)
-3. Send any voice message (up to 5 minutes)
-4. The bot transcribes, summarizes, and creates a Notion page automatically
-5. You receive a direct link to the created Notion page
-
 ### Bot commands
 
 | Command | Description |
 |---|---|
-| `/start` | Register and get started |
+| `/start` | Register and launch the onboarding wizard |
+| `/reset` | Clear your Notion credentials and restart setup |
 | `/help` | Show usage instructions |
-| `/settings` | Connect or update your Notion API key and database ID |
+
+### Onboarding flow
+
+When a new user sends `/start`, the bot launches a guided FSM-based setup:
+
+1. **Select language** — choose via inline keyboard (stored in DB, applied to all future responses)
+2. **Provide Notion Integration Token** — paste your token from [notion.so/my-integrations](https://www.notion.so/my-integrations)
+3. **Provide Notion Database URL or ID** — paste the full Notion URL or the raw 32-character ID; the bot extracts the ID automatically via regex
+
+Once configured, just send any voice message.
 
 ### Processing pipeline
 
 ```
-Voice message → .ogg saved → ffmpeg converts to .mp3
-    → Whisper API transcribes → GPT-4o-mini summarizes
-    → Notion page created with Summary + Action Items
-    → User receives link to the page
-```
-
----
-
-## 🗂 Project Structure
-
-```
-voice_to_notes_bot/
-├── src/
-│   ├── bot/
-│   │   ├── handlers/
-│   │   │   ├── commands.py      # /start, /help, /settings
-│   │   │   └── voice.py         # Voice message handler
-│   │   ├── middlewares/
-│   │   │   ├── taskiq.py        # Task queue integration
-│   │   │   └── user_check.py    # User registration/verification
-│   │   └── main.py              # Bot entry point, Dispatcher setup
-│   ├── tasks/
-│   │   ├── broker.py            # RedisAsyncBroker configuration
-│   │   └── tasks.py             # transcribe, summarize, export_to_notion tasks
-│   ├── services/
-│   │   ├── whisper.py           # OpenAI Whisper API client
-│   │   ├── openai_llm.py        # GPT-4o-mini prompts and response handling
-│   │   └── notion.py            # Notion API operations
-│   └── core/
-│   ├    ├── config.py            # Pydantic Settings
-│   ├    └── db.py                # SQLAlchemy async engine + session
-│   ├── db/
-         ├── database.py
-         ├── models.py
-├── alembic/                     # Database migrations
-├── tests/                       # pytest test suite
-├── Dockerfile
-├── docker-compose.yml
-├── pyproject.toml
-└── .env.example
+Voice message received
+  → .ogg saved to data/
+  → ffmpeg converts .ogg → .mp3
+  → Whisper API transcribes audio → text
+  → "Transcription complete, processing…" sent to user
+  → GPT-4o-mini generates Summary + Action Items (in user's language)
+  → Notion page created in user's personal database
+  → User receives a direct link to the Notion page
 ```
 
 ---
 
 ## 🔑 Notion Setup (Per User)
 
-Each user configures their own Notion connection independently:
+Each user independently connects their own Notion workspace through the bot:
 
-1. Go to [notion.so/my-integrations](https://www.notion.so/my-integrations) and create a new **Internal Integration**
-2. Copy the **Integration Token**
-3. Open (or create) the Notion database where notes should be saved
-4. Share the database with your integration (click **Share → Invite → your integration**)
-5. Copy the **Database ID** from the database URL:
-   `https://notion.so/workspace/`**`<DATABASE_ID>`**`?v=...`
-6. Send `/settings` to the bot and provide both values
+1. Go to [notion.so/my-integrations](https://www.notion.so/my-integrations) → **New integration**
+2. Copy the **Internal Integration Token**
+3. Open (or create) a Notion database where your notes will be saved
+4. Share the database with your integration: **Share → Invite → select your integration**
+5. Copy the database URL — the bot extracts the 32-character ID automatically from any Notion link
+6. Send `/start` to the bot and follow the onboarding wizard
 
-Credentials are stored encrypted in PostgreSQL and used exclusively for that user's exports.
+Credentials are stored per-user in PostgreSQL and used exclusively for that user's exports.
+
+---
+
+## 🗂️ Project Structure
+
+```
+voice_to_notes_bot/
+├── src/
+│   ├── bot/
+│   │   ├── handlers/
+│   │   │   ├── commands.py      # /start (FSM onboarding), /reset, /help
+│   │   │   └── voice.py         # Voice message handler
+│   │   ├── lexicon.py           # Localization strings (i18n)
+│   │   └── main.py              # Bot entry point, Dispatcher setup
+│   ├── tasks/
+│   │   ├── broker.py            # RedisAsyncBroker configuration
+│   │   └── tasks.py             # transcribe, summarize, export_to_notion + Telegram notifications
+│   ├── services/
+│   │   ├── audio.py             # ffmpeg audio conversion (.ogg → .mp3)
+│   │   ├── openai_llm.py        # GPT-4o-mini prompts with language support
+│   │   └── notion.py            # Notion API client with localized page titles/tags
+│   ├── db/
+│   │   ├── database.py          # SQLAlchemy async engine + session factory
+│   │   └── models.py            # User model: telegram_id, notion_token, db_id, lang_code
+│   └── core/
+│       └── config.py            # Pydantic Settings
+├── data/                        # Temporary audio files (auto-cleaned after processing)
+├── .env                         # Secrets — not committed to git
+├── .env.example                 # Environment variable template
+├── .gitignore
+├── docker-compose.yml           # Bot, Worker, Redis, Postgres services
+└── pyproject.toml               # Poetry dependencies
+```
 
 ---
 
 ## 🤝 Contributing
 
 1. Fork the repository
-2. Create a feature branch: `git checkout -b feature/your-feature`
-3. Run tests: `pytest tests/ -v`
-4. Submit a pull request with a clear description
-
-Please ensure new features include corresponding tests and that `docker-compose up --build` passes without errors.
+2. Create a feature branch: `git checkout -b feature/your-feature-name`
+3. Verify the full stack starts cleanly: `docker-compose up --build`
+4. Open a pull request with a clear description of the change
 
 ---
 

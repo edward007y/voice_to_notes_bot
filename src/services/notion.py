@@ -7,23 +7,30 @@ logger = logging.getLogger(__name__)
 
 
 async def create_notion_page(
-    summary: str, action_items: list[str], api_key: str, db_id: str
+    summary: str,
+    action_items: list[str],
+    api_key: str,
+    db_id: str,
+    language_code: str = "uk",
 ) -> str:
-    """
-    Створює сторінку в базі даних Notion, використовуючи персональні ключі користувача.
-    """
     logger.info("Початок експорту даних у Notion...")
-
-    # Ініціалізуємо клієнта з персональним ключем юзера
     notion = AsyncClient(auth=api_key)
-
     date_str = datetime.now().strftime("%Y-%m-%d %H:%M")
-    title = f"Голосова нотатка від {date_str}"
+
+    # Локалізація заголовків Notion
+    if language_code == "en":
+        title = f"Voice Note from {date_str}"
+        summary_heading = "📝 Summary"
+        action_heading = "✅ Action Items"
+    else:
+        title = f"Голосова нотатка від {date_str}"
+        summary_heading = "📝 Сумаризація"
+        action_heading = "✅ Завдання"
 
     children_blocks = [
         {
             "object": "block",
-            "heading_2": {"rich_text": [{"text": {"content": "📝 Сумаризація"}}]},
+            "heading_2": {"rich_text": [{"text": {"content": summary_heading}}]},
         },
         {
             "object": "block",
@@ -35,7 +42,7 @@ async def create_notion_page(
         children_blocks.append(
             {
                 "object": "block",
-                "heading_2": {"rich_text": [{"text": {"content": "✅ Action Items"}}]},
+                "heading_2": {"rich_text": [{"text": {"content": action_heading}}]},
             }
         )
         for item in action_items:
@@ -48,16 +55,13 @@ async def create_notion_page(
 
     try:
         response = await notion.pages.create(
-            # Використовуючи персональний ID бази
             parent={"database_id": db_id},
             properties={"Name": {"title": [{"text": {"content": title}}]}},
             children=children_blocks,
         )
-
         page_url = response.get("url")
         logger.info(f"Сторінку успішно створено: {page_url}")
         return page_url
-
     except Exception as e:
         logger.error(f"Помилка під час експорту в Notion: {e}")
         raise
