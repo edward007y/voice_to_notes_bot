@@ -1,7 +1,7 @@
 from aiogram import Bot
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
-from taskiq import TaskiqEvents, TaskiqState
+from taskiq import SimpleRetryMiddleware, TaskiqEvents, TaskiqState
 from taskiq_redis import ListQueueBroker, RedisAsyncResultBackend
 
 from src.core.config import settings
@@ -10,9 +10,9 @@ result_backend = RedisAsyncResultBackend(
     redis_url=settings.redis_url,
 )
 
-broker = ListQueueBroker(
-    url=settings.redis_url,
-).with_result_backend(result_backend)
+broker = ListQueueBroker(url=settings.redis_url).with_middlewares(
+    SimpleRetryMiddleware(default_retry_count=3)
+)
 
 
 @broker.on_event(TaskiqEvents.WORKER_STARTUP)

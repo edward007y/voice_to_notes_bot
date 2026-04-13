@@ -7,7 +7,6 @@ from aiogram.enums import ParseMode
 
 from src.bot.handlers import commands, voice
 from src.core.config import settings
-from src.db.database import init_models  # ДОДАНО: імпорт ініціалізації БД
 
 
 async def main() -> None:
@@ -16,7 +15,6 @@ async def main() -> None:
 
     # ДОДАНО: Ініціалізуємо базу даних перед запуском бота
     logging.info("Ініціалізація бази даних...")
-    await init_models()
 
     bot = Bot(
         token=settings.bot_token.get_secret_value(),
