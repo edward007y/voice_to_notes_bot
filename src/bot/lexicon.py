@@ -1,48 +1,46 @@
 TEXTS = {
     "uk": {
-        "lang_saved": "🇺🇦 Мову встановлено! Тепер налаштуємо Notion.",
-        "already_setup": "Привіт! Твій Notion вже підключено. Просто надішли мені голосове повідомлення! 🎙\n\n<i>(Щоб змінити базу, натисни /reset)</i>",
+        "start": "👋 Привіт! Я бот, який перетворює твої голосові повідомлення на структуровані нотатки в Notion.\n\nОбери мову для продовження:",
+        "lang_saved": "🇺🇦 Мову успішно збережено! Продовжимо налаштування.",
         "step_1": (
-            "<b>Крок 1: Створення ключа (API Key)</b> 🔑\n"
-            "1. Перейди сюди: https://www.notion.so/my-integrations\n"
-            "2. Натисни кнопку <b>New integration</b>.\n"
-            "3. Назви її, наприклад, <i>Voice Notes Bot</i> і натисни Submit.\n"
-            "4. Скопіюй <b>Internal Integration Secret</b> (починається на <code>secret_...</code>).\n\n"
-            "👇 <b>Надішли цей ключ сюди повідомленням:</b>"
+            "<b>Крок 1: Підключення до Notion</b> 🔑\n\n"
+            "1. Перейди на <a href='https://www.notion.so/my-integrations'>сторінку інтеграцій Notion</a>.\n"
+            "2. Створи нову інтеграцію (New integration).\n"
+            "3. Скопіюй свій 'Internal Integration Secret' (він починається на <code>ntn_</code>).\n\n"
+            "👇 Надішли цей ключ сюди повідомленням:"
         ),
         "step_2": (
             "Ключ прийнято! ✅\n\n"
-            "<b>Крок 2: Підготовка бази даних</b> 📁\n"
-            "1. Створи нову базу даних у Notion.\n"
-            "2. ⚠️ <b>НАЙВАЖЛИВІШЕ:</b> У правому верхньому куті натисни <code>...</code> -> <b>Add connections</b> -> вибери свою інтеграцію.\n"
-            "3. Скопіюй посилання на сторінку (Share -> Copy link).\n\n"
-            "👇 <b>Надішли мені це повне посилання:</b>"
+            "<b>Крок 2: Підготовка бази даних</b> 📁\n\n"
+            "1. Створи нову сторінку в Notion і <b>обов'язково обери формат Table або Database</b> (таблиця).\n"
+            "2. ⚠️ <b>КРИТИЧНО ВАЖЛИВО:</b> У правому верхньому куті сторінки натисни <code>...</code> -> <b>Add connections</b> -> знайди і обери свою створену інтеграцію.\n"
+            "3. Скопіюй повне посилання на цю сторінку (Share -> Copy link).\n\n"
+            "👇 Надішли мені повне посилання сюди:"
         ),
-        "invalid_link": "⚠️ Не зміг розпізнати посилання. Спробуй ще раз.",
-        "setup_done": "🎉 <b>Бінго! Налаштування завершено.</b>\nТепер просто надиктовуй мені свої думки! 🎙",
-        "reset": "🔄 Налаштування скинуто!",
+        "setup_done": "🎉 <b>Бінго! Налаштування завершено.</b>\nТепер просто надсилай мені свої голосові нотатки! 🎙️",
+        "invalid_link": "❌ Це не схоже на правильне посилання Notion. Будь ласка, скопіюй повне посилання на базу даних (Share -> Copy link) і надішли його знову.",
+        "reset": "🔄 Всі твої налаштування та ключі видалено. Почнемо спочатку!",
     },
     "en": {
-        "lang_saved": "🇬🇧 Language set! Now let's set up Notion.",
-        "already_setup": "Hello! Your Notion is already connected. Just send me a voice message! 🎙\n\n<i>(To change the database, tap /reset)</i>",
+        "start": "👋 Hi! I'm a bot that turns your voice messages into structured Notion notes.\n\nChoose your language to continue:",
+        "lang_saved": "🇬🇧 Language successfully saved! Let's continue the setup.",
         "step_1": (
-            "<b>Step 1: Create an API Key</b> 🔑\n"
-            "1. Go here: https://www.notion.so/my-integrations\n"
-            "2. Click <b>New integration</b>.\n"
-            "3. Name it (e.g., <i>Voice Notes Bot</i>) and Submit.\n"
-            "4. Copy the <b>Internal Integration Secret</b> (starts with <code>secret_...</code>).\n\n"
-            "👇 <b>Send this key here as a message:</b>"
+            "<b>Step 1: Notion Connection</b> 🔑\n\n"
+            "1. Go to the <a href='https://www.notion.so/my-integrations'>Notion Integrations page</a>.\n"
+            "2. Create a new integration.\n"
+            "3. Copy your 'Internal Integration Secret' (it starts with <code>ntn_</code>).\n\n"
+            "👇 Send this key here as a message:"
         ),
         "step_2": (
             "Key accepted! ✅\n\n"
-            "<b>Step 2: Prepare the Database</b> 📁\n"
-            "1. Create a new database in Notion.\n"
-            "2. ⚠️ <b>CRITICAL:</b> In the top right corner, click <code>...</code> -> <b>Add connections</b> -> select your integration.\n"
-            "3. Copy the page link (Share -> Copy link).\n\n"
-            "👇 <b>Send me the full link:</b>"
+            "<b>Step 2: Prepare the Database</b> 📁\n\n"
+            "1. Create a new page in Notion and <b>make sure to select the Table or Database format</b>.\n"
+            "2. ⚠️ <b>CRITICAL:</b> In the top right corner of the page, click <code>...</code> -> <b>Add connections</b> -> select your newly created integration.\n"
+            "3. Copy the full link to this page (Share -> Copy link).\n\n"
+            "👇 Send me the full link here:"
         ),
-        "invalid_link": "⚠️ Could not recognize the link. Please try again.",
-        "setup_done": "🎉 <b>Bingo! Setup is complete.</b>\nNow just send me your voice notes! 🎙",
-        "reset": "🔄 Settings have been reset!",
+        "setup_done": "🎉 <b>Bingo! Setup is complete.</b>\nNow just send me your voice notes! 🎙️",
+        "invalid_link": "❌ This doesn't look like a valid Notion link. Please copy the full link to the database (Share -> Copy link) and send it again.",
+        "reset": "🔄 All your settings and keys have been deleted. Let's start over!",
     },
 }
